@@ -1121,6 +1121,29 @@ void VoltDBEngine::setBuffers(char *parameterBuffer,
     m_arieslogBufferCapacity = arieslogBufferCapacity;
 }
 
+void VoltDBEngine::setBuffers(
+        char *parameterBuffer, int parameterBuffercapacity,
+        char *resultBuffer, int resultBufferCapacity,
+        char *exceptionBuffer, int exceptionBufferCapacity,
+        char *arieslogBuffer, int arieslogBufferCapacity,
+        char *antiCacheUtilityBuffer, int antiCacheUtilityBufferCapcity
+) {
+    m_parameterBuffer = parameterBuffer;
+    m_parameterBufferCapacity = parameterBuffercapacity;
+
+    m_reusedResultBuffer = resultBuffer;
+    m_reusedResultCapacity = resultBufferCapacity;
+
+    m_exceptionBuffer = exceptionBuffer;
+    m_exceptionBufferCapacity = exceptionBufferCapacity;
+
+    m_arieslogBuffer = arieslogBuffer;
+    m_arieslogBufferCapacity = arieslogBufferCapacity;
+
+    m_antiCacheUtilityBuffer = antiCacheUtilityBuffer;
+    m_antiCacheUtilityBufferCapacity = antiCacheUtilityBufferCapcity;
+}
+
 // -------------------------------------------------
 // MISC FUNCTIONS
 // -------------------------------------------------
@@ -2017,8 +2040,8 @@ int VoltDBEngine::antiCacheReadBlocks(int32_t tableId, int numBlocks, int32_t bl
                    numBlocks, table->name().c_str(), e.message().c_str());
         // FIXME: This won't work if we execute are executing this operation the
         //        same time that txns are running
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
+        resetAntiCacheUtilityOutputBuffer();
+        e.serialize(getAntiCacheUtilityOutputSerializer());
         retval = ENGINE_ERRORCODE_ERROR;
     }
 
