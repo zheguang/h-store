@@ -205,7 +205,7 @@ TEST_F(AntiCacheEvictionManagerTest, MigrateBlock) {
 
     ExecutorContext* ctx = m_engine->getExecutorContext();
 
-    AntiCacheEvictionManager* acem = new AntiCacheEvictionManager(m_engine, *ctx);
+    AntiCacheEvictionManager* acem = new AntiCacheEvictionManager(m_engine);
     AntiCacheDB* nvmdb = new NVMAntiCacheDB(ctx, temp, BLOCK_SIZE, MAX_SIZE);
     AntiCacheDB* berkeleydb = new BerkeleyAntiCacheDB(ctx, temp, BLOCK_SIZE, MAX_SIZE);
 
@@ -300,7 +300,7 @@ TEST_F(AntiCacheEvictionManagerTest, FullBackingStore) {
 
     ExecutorContext* ctx = m_engine->getExecutorContext();
 
-    AntiCacheEvictionManager* acem = new AntiCacheEvictionManager(m_engine, *ctx);
+    AntiCacheEvictionManager* acem = new AntiCacheEvictionManager(m_engine);
     AntiCacheDB* nvmdb = new NVMAntiCacheDB(ctx, temp, BLOCK_SIZE, 2 * BLOCK_SIZE - 1);
     AntiCacheDB* berkeleydb = new BerkeleyAntiCacheDB(ctx, temp, BLOCK_SIZE, MAX_SIZE);
     AntiCacheDB* acdb;
