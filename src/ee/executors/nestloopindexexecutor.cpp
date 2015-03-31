@@ -174,10 +174,13 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstract_node,
     inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
     inner_catalogTable = catalog_db->tables().get(inner_table->name());
+    assert(inner_catalogTable);
 
     assert(node->getInputTables().size() == 1);
     outer_table = node->getInputTables()[0];
     assert(outer_table);
+    outer_catalogTable = catalog_db->tables().get(outer_table->name());
+    assert(outer_catalogTable);
 
     //
     // Grab the Index from our inner table
@@ -272,6 +275,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
     while (outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
+#ifdef ANTICACHE
+        // TODO: weaken the check.
+        //checkEvictionInProgress(*outer_catalogTable);
+        //checkEvictionInProgress(*inner_catalogTable);
+#endif
         outer_table->updateTupleAccessCount();
         
         //
@@ -326,6 +334,10 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params, ReadWriteTracke
                (m_lookupType != INDEX_LOOKUP_TYPE_EQ &&
                 !(inner_tuple = index->nextValue()).isNullTuple()))
         {
+            #ifdef ANTICACHE
+            checkEvictionPreparedAccess(*inner_catalogTable, *inner_table, inner_tuple);
+            #endif
+
             match = true;
             inner_table->updateTupleAccessCount();
             

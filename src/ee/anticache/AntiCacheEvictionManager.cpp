@@ -189,6 +189,10 @@ bool AntiCacheEvictionManager::updateUnevictedTuple(PersistentTable* table, Tabl
 }
     
 bool AntiCacheEvictionManager::updateTuple(PersistentTable* table, TableTuple* tuple, bool is_insert) {
+    if (hasInitEvictionPreparation() && isMarkedToEvict(*table, *tuple)) {
+      //throwFatalException("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
+      VOLT_INFO("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
+    }
     
     if (table->getEvictedTable() == NULL || table->isBatchEvicted())  // no need to maintain chain for non-evictable tables or batch evicted tables
         return true; 
@@ -633,10 +637,6 @@ void AntiCacheEvictionManager::evictBlockFinish(int64_t prepareTxnId) {
 bool AntiCacheEvictionManager::evictBlockToDiskPrepare(PersistentTable *table, const long block_size, int num_blocks) {
     int tuple_length = -1;
 
-    #ifdef VOLT_INFO_ENABLED
-    int active_tuple_count = (int)table->activeTupleCount();
-    #endif
-
     // Iterate through the table and pluck out tuples to put in our block
     TableTuple tuple(table->m_schema);
     EvictionIterator evict_itr(table);
@@ -659,6 +659,11 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepare(PersistentTable *table, c
             if (tuple_length == -1) {
                 tuple_length = tuple.tupleLength();
             }
+
+            #ifndef ANTICACHE_TIMESTAMPS
+            // remove the tuple from the eviction chain
+            removeTuple(table, &tuple);
+            #endif
 
             if (!tuple.isEvicted()) {
                 m_evictionInfo.tracker->markTupleWritten(table, &tuple);
@@ -740,7 +745,6 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
                 {
                     childTuplesSize+= MAX_EVICTED_TUPLE_SIZE;
                     if(blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize >= block_size){
-                        VOLT_INFO("Size of block exceeds!!in child %d", blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize);
                         nomore = true;
                         break;
                     }
@@ -755,10 +759,14 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
                 VOLT_DEBUG("Chind tuple to be evicted: %p", (*it).address());
             }
             if(blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize >= block_size){
-                VOLT_INFO("Size of block exceeds!! %d", blockSerializedSize() + MAX_EVICTED_TUPLE_SIZE + childTuplesSize);
+                VOLT_INFO("Size of block exceeds!!");
                 break;
             }
             parentTuples++;
+#ifndef ANTICACHE_TIMESTAMPS
+            // remove the tuple from the eviction chain
+            removeTuple(table, &tuple);
+#endif
 
             if (tuple.isEvicted()) {
                 VOLT_INFO("Tuple %d is already evicted. Skipping", table->getTupleID(tuple.address()));
@@ -777,8 +785,8 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
 
 
             num_tuples_evicted++;
-            VOLT_DEBUG("Added new evicted %s tuple to block #%x [tuplesEvicted=%d]",
-                    table->name().c_str(), block_id, num_tuples_evicted);
+            VOLT_DEBUG("Prepare for new evicted %s tuple [tuplesPrepared=%d]",
+                    table->name().c_str(), num_tuples_evicted);
             if(blockSerializedSize + childTuplesSize >= block_size){
                 break;
             }
@@ -951,10 +959,10 @@ bool AntiCacheEvictionManager::evictBlockToDisk(PersistentTable *table, const lo
 
             //current_tuple_start_position = out.position();
 
-            #ifndef ANTICACHE_TIMESTAMPS
-            // remove the tuple from the eviction chain
-            removeTuple(table, &tuple);
-            #endif
+            //#ifndef ANTICACHE_TIMESTAMPS
+            //// remove the tuple from the eviction chain
+            //removeTuple(table, &tuple);
+            //#endif
 
             if (tuple.isEvicted()) {
                 VOLT_WARN("Tuple %d from %s is already evicted. Skipping",
@@ -1237,10 +1245,10 @@ bool AntiCacheEvictionManager::evictBlockToDiskInBatch(PersistentTable *table, P
             }
             parentTuples++;
 
-#ifndef ANTICACHE_TIMESTAMPS
-            // remove the tuple from the eviction chain
-            removeTuple(table, &tuple);
-#endif
+//#ifndef ANTICACHE_TIMESTAMPS
+//            // remove the tuple from the eviction chain
+//            removeTuple(table, &tuple);
+//#endif
             if (tuple.isEvicted()) {
                 VOLT_INFO("Tuple %d is already evicted. Skipping", table->getTupleID(tuple.address()));
                 continue;
@@ -1977,9 +1985,12 @@ void AntiCacheEvictionManager::recordEvictedAccess(catalog::Table* catalogTable,
 }
 
 void AntiCacheEvictionManager::throwEvictionPreparedAccessException(const catalog::Table& table, const TableTuple& tuple) {
-  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s (%d)",
-            table.name().c_str(), 
-            table.relativeIndex());
+  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s", table.name().c_str());
+  throw EvictionPreparedTupleAccessException(table.relativeIndex());
+}
+
+void AntiCacheEvictionManager::throwEvictionPreparedAccessException(const catalog::Table& table) {
+  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s", table.name().c_str());
   throw EvictionPreparedTupleAccessException(table.relativeIndex());
 }
 

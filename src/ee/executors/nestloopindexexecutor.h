@@ -102,6 +102,7 @@ protected:
     TableIndex *index;
     TableTuple index_values;
     Table* outer_table;
+    catalog::Table* outer_catalogTable;
     JoinType join_type;
 
     //So valgrind doesn't report the data as lost.

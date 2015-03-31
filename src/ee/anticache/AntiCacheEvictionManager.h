@@ -107,6 +107,7 @@ public:
     void throwEvictedAccessException();
 
     void throwEvictionPreparedAccessException(const catalog::Table& table, const TableTuple& tuple);
+    void throwEvictionPreparedAccessException(const catalog::Table& table);
     
 protected:
     void initEvictResultTable();

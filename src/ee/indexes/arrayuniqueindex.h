@@ -39,28 +39,29 @@ const int ARRAY_INDEX_INITIAL_SIZE = 131072; // (2^17)
  * as the entry value is assured to be sequential and limited to a small number.
  * @see TableIndex
  */
-class ArrayUniqueIndex : public TableIndex {
+class ArrayUniqueIndex : public LockBasedTableIndex {
     friend class TableIndexFactory;
 
     public:
         ~ArrayUniqueIndex();
-        bool addEntry(const TableTuple *tuples);
-        bool deleteEntry(const TableTuple *tuple);
-        bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue);
-        bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress);
-        bool exists(const TableTuple* values);
-        bool moveToKey(const TableTuple *searchKey);
-        bool moveToTuple(const TableTuple *searchTuple);
-        TableTuple nextValueAtKey();
-        bool advanceToNextKey();
-
-        bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs);
-
-        size_t getSize() const { return (num_entries_); }
         int64_t getMemoryEstimate() const {
             return sizeof(void*) * ARRAY_INDEX_INITIAL_SIZE;
         }
         std::string getTypeName() const { return "ArrayIntUniqueIndex"; };
+    private:
+        bool _addEntry(const TableTuple *tuples);
+        bool _deleteEntry(const TableTuple *tuple);
+        bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue);
+        bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress);
+        bool _exists(const TableTuple* values);
+        bool _moveToKey(const TableTuple *searchKey);
+        bool _moveToTuple(const TableTuple *searchTuple);
+        TableTuple _nextValueAtKey();
+        bool _advanceToNextKey();
+
+        bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs);
+
+        size_t _getSize() const { return (num_entries_); }
 
     protected:
         ArrayUniqueIndex(const TableIndexScheme &scheme);

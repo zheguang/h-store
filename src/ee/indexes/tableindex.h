@@ -46,6 +46,7 @@
 #ifndef HSTORETABLEINDEX_H
 #define HSTORETABLEINDEX_H
 
+//#include <pthread.h>
 #include <vector>
 #include <string>
 #include "boost/shared_ptr.hpp"
@@ -348,6 +349,194 @@ protected:
 
     // index memory size
     int64_t m_memoryEstimate;
+};
+
+class LockBasedTableIndex : public TableIndex {
+  public:
+    virtual ~LockBasedTableIndex() {
+      //pthread_mutex_destroy(&m_anticacheLock);
+    }
+
+    bool addEntry(const TableTuple *tuple) {
+      lock();
+      bool result = _addEntry(tuple);
+      unlock();
+      return result;
+    }
+
+    bool deleteEntry(const TableTuple *tuple) {
+      lock();
+      bool result = _deleteEntry(tuple);
+      unlock();
+      return result;
+    }
+
+    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) {
+      lock();
+      bool result = _replaceEntry(oldTupleValue, newTupleValue);
+      unlock();
+      return result;
+    }
+    
+    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) {
+      lock();
+      bool result = _setEntryToNewAddress(tuple, address, oldAddress);
+      unlock();
+      return result;
+    }
+    
+    bool exists(const TableTuple* values) {
+      lock();
+      bool result = _exists(values);
+      unlock();
+      return result;
+    }
+
+    bool moveToKey(const TableTuple *searchKey) {
+      lock();
+      bool result = _moveToKey(searchKey);
+      unlock();
+      return result;
+    }
+
+    bool moveToTuple(const TableTuple *searchTuple) {
+      lock();
+      bool result = _moveToTuple(searchTuple);
+      unlock();
+      return result;
+    }
+
+    TableTuple nextValueAtKey() {
+      lock();
+      TableTuple result = _nextValueAtKey();
+      unlock();
+      return result;
+    }
+
+    bool advanceToNextKey() {
+      lock();
+      bool result = _advanceToNextKey();
+      unlock();
+      return result;
+    };
+
+    void moveToKeyOrGreater(const TableTuple *searchKey) {
+      lock();
+      _moveToKeyOrGreater(searchKey);
+      unlock();
+    };
+
+    void moveToGreaterThanKey(const TableTuple *searchKey) {
+      lock();
+      _moveToGreaterThanKey(searchKey);
+      unlock();
+    };
+
+    void moveToEnd(bool begin) {
+      lock();
+      _moveToEnd(begin);
+      unlock();
+    }
+
+    TableTuple nextValue() {
+      lock();
+      TableTuple result = _nextValue();
+      unlock();
+      return result;
+    };
+
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+      lock();
+      bool result = _checkForIndexChange(lhs, rhs);
+      unlock();
+      return result;
+    }
+
+    size_t getSize() const {
+      lock();
+      size_t result = _getSize();
+      unlock();
+      return result;
+    }
+    
+    void ensureCapacity(uint32_t capacity) {
+      lock();
+      _ensureCapacity(capacity);
+      unlock();
+    }
+
+    // print out info about lookup usage
+    void printReport() {
+      lock();
+      _printReport();
+      unlock();
+    }
+
+  protected:
+    LockBasedTableIndex(const TableIndexScheme &scheme):
+      TableIndex(scheme)
+      {
+        initLock();
+      }
+
+  private:
+    struct TASLock {
+      bool state;
+    };
+
+    void initLock() const {
+#ifdef ANTICACHE
+      m_anticacheLock.state = 0;
+#endif
+    }
+
+    void lock() const {
+#ifdef ANTICACHE
+      //pthread_mutex_lock(&m_anticacheLock);
+      while (__atomic_test_and_set(&(m_anticacheLock.state), __ATOMIC_SEQ_CST) == 1) {
+      }
+#endif
+    }
+
+    void unlock() const {
+#ifdef ANTICACHE
+      //pthread_mutex_unlock(&m_anticacheLock);
+      __atomic_clear(&(m_anticacheLock.state), __ATOMIC_SEQ_CST);
+#endif
+    }
+
+    virtual bool _addEntry(const TableTuple *tuple) = 0;
+    virtual bool _deleteEntry(const TableTuple *tuple) = 0;
+    virtual bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) = 0;
+    virtual bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) = 0;
+    virtual bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) = 0;
+    virtual bool _exists(const TableTuple* values) = 0;
+    virtual bool _moveToKey(const TableTuple *searchKey) = 0;
+    virtual bool _moveToTuple(const TableTuple *searchTuple) = 0;
+    virtual void _ensureCapacity(uint32_t capacity) {
+    }
+    virtual size_t _getSize() const = 0;
+    virtual void _printReport() {};
+    virtual TableTuple _nextValueAtKey() = 0;
+    virtual bool _advanceToNextKey() {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    };
+    virtual void _moveToKeyOrGreater(const TableTuple *searchKey) {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    };
+    virtual void _moveToGreaterThanKey(const TableTuple *searchKey) {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    };
+    virtual void _moveToEnd(bool begin) {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+    virtual TableTuple _nextValue() {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    };
+
+#ifdef ANTICACHE
+    mutable TASLock m_anticacheLock;
+#endif
 };
 
 }

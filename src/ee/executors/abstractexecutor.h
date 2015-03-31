@@ -120,6 +120,14 @@ class AbstractExecutor {
         antiCacheManager->throwEvictionPreparedAccessException(catalogTable, tuple);
       }
     }
+
+    void checkEvictionInProgress(const catalog::Table& catalogTable) {
+      AntiCacheEvictionManager* antiCacheManager = executor_context->getAntiCacheEvictionManager();
+      assert(antiCacheManager);
+      if (antiCacheManager->hasInitEvictionPreparation()) {
+        antiCacheManager->throwEvictionPreparedAccessException(catalogTable);
+      }
+    }
 #endif
 
     /** Concrete executor classes implement initialization in p_init() */

@@ -378,6 +378,10 @@ protected:
     TableTuple m_tempTuple;
     /** not temptuple. these are for internal use. */
     TableTuple m_tmpTarget1, m_tmpTarget2;
+
+    TableTuple m_tmpAnticacheTarget1;
+    TableTuple m_tmpAnticacheTarget2;
+
     TupleSchema* m_schema;
     uint32_t m_tupleCount;
     uint32_t m_tupleAccesses;

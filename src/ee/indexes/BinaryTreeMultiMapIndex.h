@@ -59,7 +59,7 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
-class BinaryTreeMultiMapIndex : public TableIndex
+class BinaryTreeMultiMapIndex : public LockBasedTableIndex
 {
 
 
@@ -79,20 +79,27 @@ public:
         delete m_entries;
         delete m_allocator;
     };
+    
+    int64_t getMemoryEstimate() const {
+        return m_memoryEstimate;
+    }
+    
+    std::string getTypeName() const { return "BinaryTreeMultiMapIndex"; };
 
-    bool addEntry(const TableTuple *tuple)
+private:
+    bool _addEntry(const TableTuple *tuple)
     {
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return addEntryPrivate(tuple, m_tmp1);
     }
 
-    bool deleteEntry(const TableTuple *tuple)
+    bool _deleteEntry(const TableTuple *tuple)
     {
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return deleteEntryPrivate(tuple, m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *oldTupleValue,
+    bool _replaceEntry(const TableTuple *oldTupleValue,
                       const TableTuple* newTupleValue)
     {
         // this can probably be optimized
@@ -116,13 +123,13 @@ public:
         return (deleted && inserted);
     }
     
-    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
+    bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
+        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates; 
         
 //        int i = 0; 
         std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries->equal_range(m_tmp1);
+        for (key_iter = m_entries->equal_range(m_anticacheTmp);
              key_iter.first != key_iter.second;
              ++(key_iter.first))
         {
@@ -134,7 +141,7 @@ public:
                 //std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
                 //return retval.second;
 
-                m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
+                m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
                 return true;
             }
         }
@@ -147,14 +154,14 @@ public:
         return false;
     }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs)
+    bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs)
     {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
         return !(m_eq(m_tmp1, m_tmp2));
     }
 
-    bool exists(const TableTuple* values)
+    bool _exists(const TableTuple* values)
     {
         ++m_lookups;
         m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
@@ -162,19 +169,19 @@ public:
         return (m_entries->find(m_tmp1) != m_entries->end());
     }
 
-    bool moveToKey(const TableTuple *searchKey)
+    bool _moveToKey(const TableTuple *searchKey)
     {
         m_tmp1.setFromKey(searchKey);
-        return moveToKey(m_tmp1);
+        return moveToKeyPrivate(m_tmp1);
     }
 
-    bool moveToTuple(const TableTuple *searchTuple)
+    bool _moveToTuple(const TableTuple *searchTuple)
     {
         m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
-        return moveToKey(m_tmp1);
+        return moveToKeyPrivate(m_tmp1);
     }
 
-    void moveToKeyOrGreater(const TableTuple *searchKey)
+    void _moveToKeyOrGreater(const TableTuple *searchKey)
     {
         ++m_lookups;
         m_begin = true;
@@ -182,7 +189,7 @@ public:
         m_seqIter = m_entries->lower_bound(m_tmp1);
     }
 
-    void moveToGreaterThanKey(const TableTuple *searchKey)
+    void _moveToGreaterThanKey(const TableTuple *searchKey)
     {
         ++m_lookups;
         m_begin = true;
@@ -190,7 +197,7 @@ public:
         m_seqIter = m_entries->upper_bound(m_tmp1);
     }
 
-    void moveToEnd(bool begin)
+    void _moveToEnd(bool begin)
     {
         ++m_lookups;
         m_begin = begin;
@@ -200,7 +207,7 @@ public:
             m_seqRIter = m_entries->rbegin();
     }
 
-    TableTuple nextValue()
+    TableTuple _nextValue()
     {
         TableTuple retval(m_tupleSchema);
 
@@ -219,7 +226,7 @@ public:
         return retval;
     }
 
-    TableTuple nextValueAtKey()
+    TableTuple _nextValueAtKey()
     {
         if (m_match.isNullTuple()) return m_match;
         TableTuple retval = m_match;
@@ -231,24 +238,18 @@ public:
         return retval;
     }
 
-    bool advanceToNextKey()
+    bool _advanceToNextKey()
     {
         if (m_keyIter.second == m_entries->end())
             return false;
-        return moveToKey(m_keyIter.second->first);
+        return moveToKeyPrivate(m_keyIter.second->first);
     }
 
-    size_t getSize() const { return m_entries->size(); }
-    
-    int64_t getMemoryEstimate() const {
-        return m_memoryEstimate;
-    }
-    
-    std::string getTypeName() const { return "BinaryTreeMultiMapIndex"; };
+    size_t _getSize() const { return m_entries->size(); }
 
 protected:
     BinaryTreeMultiMapIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
+        LockBasedTableIndex(scheme),
         m_begin(true),
         m_eq(m_keySchema)
     {
@@ -283,7 +284,7 @@ protected:
         return false;
     }
 
-    bool moveToKey(const KeyType &key)
+    bool moveToKeyPrivate(const KeyType &key)
     {
         ++m_lookups;
         m_begin = true;
@@ -301,6 +302,7 @@ protected:
     AllocatorType *m_allocator;
     KeyType m_tmp1;
     KeyType m_tmp2;
+    KeyType m_anticacheTmp;
 
     // iteration stuff
     bool m_begin;

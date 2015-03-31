@@ -247,6 +247,8 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 
     m_tmpTarget1 = TableTuple(m_schema);
     m_tmpTarget2 = TableTuple(m_schema);
+    m_tmpAnticacheTarget1 = TableTuple(m_schema);
+    m_tmpAnticacheTarget2 = TableTuple(m_schema);
 
     onSetColumns(); // for more initialization
 }
