@@ -641,6 +641,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params, ReadWriteTracker *t
     //
     if (m_aggregateNode != NULL && aggregate_isset) {
         m_tuple.move(aggregate_tuple_address);
+#ifdef ANTICACHE
+        checkEvictionPreparedAccess(*m_catalogTable, *m_targetTable, m_tuple);
+#endif
         //
         // Inline Projection
         //

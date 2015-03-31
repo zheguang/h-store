@@ -1727,6 +1727,9 @@ TEST CASES
         <jvmarg value="-Xcheck:jni"/>
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
         <jvmarg value="-Dlog4j.configuration=${basedir}/log4j.properties"/>
+        <jvmarg value="-XX:ErrorFile=${basedir}/hs_err.log"/>
+        <jvmarg value="-XX:-HeapDumpOnOutOfMemoryError"/>
+        <jvmarg value="-XX:HeapDumpPath=/home/sam"/>
         
         <assertions refid="site.assertions"/>
 
@@ -2538,6 +2541,9 @@ UTILITIES
         <jvmarg value="-Dlog4j.configuration=${basedir}/log4j.properties"/>
         <jvmarg value="-server" />
         <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
+        <jvmarg value="-XX:ErrorFile=${basedir}/hs_err.log"/>
+        <jvmarg value="-XX:-HeapDumpOnOutOfMemoryError"/>
+        <jvmarg value="-XX:HeapDumpPath=/home/sam"/>
 
         <arg value="catalog.jar=${jar}" />
         <arg value="conf=${conf}" />
