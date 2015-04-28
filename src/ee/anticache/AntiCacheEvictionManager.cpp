@@ -190,7 +190,8 @@ bool AntiCacheEvictionManager::updateUnevictedTuple(PersistentTable* table, Tabl
     
 bool AntiCacheEvictionManager::updateTuple(PersistentTable* table, TableTuple* tuple, bool is_insert) {
     if (hasInitEvictionPreparation() && isMarkedToEvict(*table, *tuple)) {
-      throwFatalException("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
+      //throwFatalException("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
+      VOLT_INFO("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
     }
     
     if (table->getEvictedTable() == NULL || table->isBatchEvicted())  // no need to maintain chain for non-evictable tables or batch evicted tables
@@ -636,10 +637,6 @@ void AntiCacheEvictionManager::evictBlockFinish(int64_t prepareTxnId) {
 bool AntiCacheEvictionManager::evictBlockToDiskPrepare(PersistentTable *table, const long block_size, int num_blocks) {
     int tuple_length = -1;
 
-    #ifdef VOLT_INFO_ENABLED
-    int active_tuple_count = (int)table->activeTupleCount();
-    #endif
-
     // Iterate through the table and pluck out tuples to put in our block
     TableTuple tuple(table->m_schema);
     EvictionIterator evict_itr(table);
@@ -748,7 +745,6 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
                 {
                     childTuplesSize+= MAX_EVICTED_TUPLE_SIZE;
                     if(blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize >= block_size){
-                        VOLT_INFO("Size of block exceeds!!in child %d", blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize);
                         nomore = true;
                         break;
                     }
@@ -763,7 +759,7 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
                 VOLT_DEBUG("Chind tuple to be evicted: %p", (*it).address());
             }
             if(blockSerializedSize + MAX_EVICTED_TUPLE_SIZE + childTuplesSize >= block_size){
-                VOLT_INFO("Size of block exceeds!! %d", blockSerializedSize() + MAX_EVICTED_TUPLE_SIZE + childTuplesSize);
+                VOLT_INFO("Size of block exceeds!!");
                 break;
             }
             parentTuples++;
@@ -789,8 +785,8 @@ bool AntiCacheEvictionManager::evictBlockToDiskPrepareInBatch(PersistentTable *t
 
 
             num_tuples_evicted++;
-            VOLT_DEBUG("Added new evicted %s tuple to block #%x [tuplesEvicted=%d]",
-                    table->name().c_str(), block_id, num_tuples_evicted);
+            VOLT_DEBUG("Prepare for new evicted %s tuple [tuplesPrepared=%d]",
+                    table->name().c_str(), num_tuples_evicted);
             if(blockSerializedSize + childTuplesSize >= block_size){
                 break;
             }

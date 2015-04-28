@@ -103,12 +103,12 @@ public:
     }
 
     bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
+        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates;
 
         //        int i = 0; 
         std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries->equal_range(m_tmp1);
+        for (key_iter = m_entries->equal_range(m_anticacheTmp);
                 key_iter.first != key_iter.second;
                 ++(key_iter.first)) {
 
@@ -117,7 +117,7 @@ public:
             if (key_iter.first->second == oldAddress) {
                 // XXX key_iter.first->second = address;
                 m_entries->erase(key_iter.first);
-                m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
+                m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
                 return true;
             }
             
@@ -227,6 +227,7 @@ protected:
     AllocatorType *m_allocator;
     KeyType m_tmp1;
     KeyType m_tmp2;
+    KeyType m_anticacheTmp;
 
     // iteration stuff
     typename std::pair<MMCIter, MMCIter> m_keyIter;

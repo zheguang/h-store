@@ -46,6 +46,7 @@
 #ifndef HSTORETABLEINDEX_H
 #define HSTORETABLEINDEX_H
 
+#include <pthread.h>
 #include <vector>
 #include <string>
 #include "boost/shared_ptr.hpp"
@@ -348,6 +349,174 @@ protected:
 
     // index memory size
     int64_t m_memoryEstimate;
+};
+
+class LockBasedTableIndex : public TableIndex {
+  public:
+    virtual ~LockBasedTableIndex() {
+      pthread_mutex_destroy(&m_anticacheLock);
+    }
+
+    bool addEntry(const TableTuple *tuple) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _addEntry(tuple);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    bool deleteEntry(const TableTuple *tuple) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _deleteEntry(tuple);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _replaceEntry(oldTupleValue, newTupleValue);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+    
+    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _setEntryToNewAddress(tuple, address, oldAddress);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+    
+    bool exists(const TableTuple* values) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _exists(values);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    bool moveToKey(const TableTuple *searchKey) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _moveToKey(searchKey);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    bool moveToTuple(const TableTuple *searchTuple) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _moveToTuple(searchTuple);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    TableTuple nextValueAtKey() {
+      pthread_mutex_lock(&m_anticacheLock);
+      TableTuple result = _nextValueAtKey();
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    bool advanceToNextKey() {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _advanceToNextKey();
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    };
+
+    void moveToKeyOrGreater(const TableTuple *searchKey) {
+      pthread_mutex_lock(&m_anticacheLock);
+      _moveToKeyOrGreater(searchKey);
+      pthread_mutex_unlock(&m_anticacheLock);
+    };
+
+    void moveToGreaterThanKey(const TableTuple *searchKey) {
+      pthread_mutex_lock(&m_anticacheLock);
+      _moveToGreaterThanKey(searchKey);
+      pthread_mutex_unlock(&m_anticacheLock);
+    };
+
+    void moveToEnd(bool begin) {
+      pthread_mutex_lock(&m_anticacheLock);
+      _moveToEnd(begin);
+      pthread_mutex_unlock(&m_anticacheLock);
+    }
+
+    TableTuple nextValue() {
+      pthread_mutex_lock(&m_anticacheLock);
+      TableTuple result = _nextValue();
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    };
+
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+      pthread_mutex_lock(&m_anticacheLock);
+      bool result = _checkForIndexChange(lhs, rhs);
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+
+    size_t getSize() const {
+      pthread_mutex_lock(&m_anticacheLock);
+      size_t result = _getSize();
+      pthread_mutex_unlock(&m_anticacheLock);
+      return result;
+    }
+    
+    void ensureCapacity(uint32_t capacity) {
+      pthread_mutex_lock(&m_anticacheLock);
+      _ensureCapacity(capacity);
+      pthread_mutex_unlock(&m_anticacheLock);
+    }
+
+    // print out info about lookup usage
+    void printReport() {
+      pthread_mutex_lock(&m_anticacheLock);
+      _printReport();
+      pthread_mutex_unlock(&m_anticacheLock);
+    }
+
+  protected:
+    LockBasedTableIndex(const TableIndexScheme &scheme):
+      TableIndex(scheme)
+      {
+        pthread_mutexattr_init(&m_anticacheLockAttr);
+        pthread_mutexattr_settype(&m_anticacheLockAttr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&m_anticacheLock, &m_anticacheLockAttr);
+
+        if (pthread_mutex_init(&m_anticacheLock, NULL) != 0) {
+          throwFatalException("Anticache lock init failed.");
+        }
+      }
+
+  private:
+    virtual bool _addEntry(const TableTuple *tuple) = 0;
+    virtual bool _deleteEntry(const TableTuple *tuple) = 0;
+    virtual bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) = 0;
+    virtual bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) = 0;
+    virtual bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) = 0;
+    virtual bool _exists(const TableTuple* values) = 0;
+    virtual bool _moveToKey(const TableTuple *searchKey) = 0;
+    virtual bool _moveToTuple(const TableTuple *searchTuple) = 0;
+    virtual void _ensureCapacity(uint32_t capacity) {
+    }
+    virtual size_t _getSize() const = 0;
+    virtual void _printReport() = 0;
+    virtual TableTuple _nextValueAtKey() = 0;
+    virtual bool _advanceToNextKey() {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    };
+    virtual void _moveToKeyOrGreater(const TableTuple *searchKey) {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    };
+    virtual void _moveToGreaterThanKey(const TableTuple *searchKey) {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    };
+    virtual void _moveToEnd(bool begin) {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+    virtual TableTuple _nextValue() {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    };
+
+    mutable pthread_mutex_t m_anticacheLock;
+    mutable pthread_mutexattr_t m_anticacheLockAttr;
 };
 
 }

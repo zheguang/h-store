@@ -57,32 +57,38 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyHasher, class KeyEqualityChecker>
-class HashTableUniqueIndex : public TableIndex {
+class HashTableUniqueIndex : public LockBasedTableIndex {
     friend class TableIndexFactory;
 
     typedef h_index::AllocatorTracker<pair<const KeyType, const void*> > AllocatorType;    
     typedef boost::unordered_map<KeyType, const void*, KeyHasher, KeyEqualityChecker, AllocatorType> MapType;
 
 public:
+    int64_t getMemoryEstimate() const {
+        return m_memoryEstimate;
+        // return m_entries->bytesAllocated();
+    }
+    std::string getTypeName() const { return "HashTableUniqueIndex"; };
 
     ~HashTableUniqueIndex() {
         delete m_entries;
         delete m_allocator;
     };
 
-    bool addEntry(const TableTuple *tuple) {
+private:
+    bool _addEntry(const TableTuple *tuple) {
         VOLT_TRACE("Do they ever add Entry?\n");
 
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return addEntryPrivate(tuple, m_tmp1);
     }
 
-    bool deleteEntry(const TableTuple *tuple) {
+    bool _deleteEntry(const TableTuple *tuple) {
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return deleteEntryPrivate(m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
+    bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
         VOLT_TRACE("Do they ever replace Entry?\n");
 
         // this can probably be optimized
@@ -99,29 +105,29 @@ public:
         return (deleted && inserted);
     }
     
-    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
+    bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
         // set the key from the tuple 
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
+        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates;
         
         // erase the entry and add a entry with the same key and a NULL value
-        bool deleted = deleteEntryPrivate(m_tmp1);
+        bool deleted = deleteEntryPrivate(m_anticacheTmp);
 //        m_entries->erase(m_tmp1); 
-        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
+        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
         return (retval.second & deleted);
     }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+    bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
         return !(m_eq(m_tmp1, m_tmp2));
     }
-    bool exists(const TableTuple* values) {
+    bool _exists(const TableTuple* values) {
         ++m_lookups;
         m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
         return (m_entries->find(m_tmp1) != m_entries->end());
     }
-    bool moveToKey(const TableTuple *searchKey) {
+    bool _moveToKey(const TableTuple *searchKey) {
         ++m_lookups;
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries->find(m_tmp1);
@@ -132,7 +138,7 @@ public:
         m_match.move(const_cast<void*>(m_keyIter->second));
         return m_match.address() != NULL;
     }
-    bool moveToTuple(const TableTuple *searchTuple) {
+    bool _moveToTuple(const TableTuple *searchTuple) {
         ++m_lookups;
         m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
         m_keyIter = m_entries->find(m_tmp1);
@@ -143,31 +149,26 @@ public:
         m_match.move(const_cast<void*>(m_keyIter->second));
         return m_match.address() != NULL;
     }
-    TableTuple nextValueAtKey() {
+    TableTuple _nextValueAtKey() {
         TableTuple retval = m_match;
         m_match.move(NULL);
         return retval;
     }
 
-    virtual void ensureCapacity(uint32_t capacity) {
+    virtual void _ensureCapacity(uint32_t capacity) {
         m_entries->rehash(capacity * 2);
     }
 
-    size_t getSize() const { return m_entries->size(); }
-    int64_t getMemoryEstimate() const {
-        return m_memoryEstimate;
-        // return m_entries->bytesAllocated();
-    }
-    std::string getTypeName() const { return "HashTableUniqueIndex"; };
+    size_t _getSize() const { return m_entries->size(); }
 
     // print out info about lookup usage
-    virtual void printReport() {
+    void _printReport() {
         std::cout << "  Loadfactor: " << m_entries->load_factor() << std::endl;
     }
 
 protected:
     HashTableUniqueIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
+        LockBasedTableIndex(scheme),
         m_eq(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
@@ -197,6 +198,7 @@ protected:
     AllocatorType *m_allocator;
     KeyType m_tmp1;
     KeyType m_tmp2;
+    KeyType m_anticacheTmp;
 
     // iteration stuff
     typename MapType::const_iterator m_keyIter;
