@@ -478,11 +478,13 @@ class LockBasedTableIndex : public TableIndex {
       {
         pthread_mutexattr_init(&m_anticacheLockAttr);
         pthread_mutexattr_settype(&m_anticacheLockAttr, PTHREAD_MUTEX_RECURSIVE);
-        pthread_mutex_init(&m_anticacheLock, &m_anticacheLockAttr);
-
-        if (pthread_mutex_init(&m_anticacheLock, NULL) != 0) {
+        if (pthread_mutex_init(&m_anticacheLock, &m_anticacheLockAttr) != 0) {
           throwFatalException("Anticache lock init failed.");
         }
+
+        //if (pthread_mutex_init(&m_anticacheLock, NULL) != 0) {
+        //  throwFatalException("Anticache lock init failed.");
+        //}
       }
 
   private:
@@ -497,7 +499,7 @@ class LockBasedTableIndex : public TableIndex {
     virtual void _ensureCapacity(uint32_t capacity) {
     }
     virtual size_t _getSize() const = 0;
-    virtual void _printReport() = 0;
+    virtual void _printReport() {};
     virtual TableTuple _nextValueAtKey() = 0;
     virtual bool _advanceToNextKey() {
         throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");

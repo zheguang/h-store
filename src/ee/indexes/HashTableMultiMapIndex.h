@@ -58,7 +58,7 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyHasher, class KeyEqualityChecker>
-class HashTableMultiMapIndex : public TableIndex {
+class HashTableMultiMapIndex : public LockBasedTableIndex {
 
     friend class TableIndexFactory;
 
@@ -74,17 +74,25 @@ public:
         delete m_allocator;
     };
 
-    bool addEntry(const TableTuple *tuple) {
+    int64_t getMemoryEstimate() const {
+        return m_memoryEstimate;
+        // return m_entries->bytesAllocated();
+    }
+
+    std::string getTypeName() const { return "HashTableMultiMapIndex"; };
+
+private:
+    bool _addEntry(const TableTuple *tuple) {
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return addEntryPrivate(tuple, m_tmp1);
     }
 
-    bool deleteEntry(const TableTuple *tuple) {
+    bool _deleteEntry(const TableTuple *tuple) {
         m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         return deleteEntryPrivate(tuple, m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
+    bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
         // this can probably be optimized
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
@@ -102,7 +110,7 @@ public:
         return (deleted && inserted);
     }
 
-    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
+    bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
         m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates;
 
@@ -130,29 +138,29 @@ public:
         //        return true;
     }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+    bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
         m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
         return !(m_eq(m_tmp1, m_tmp2));
     }
 
-    bool exists(const TableTuple* values) {
+    bool _exists(const TableTuple* values) {
         ++m_lookups;
         m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
         return (m_entries->find(m_tmp1) != m_entries->end());
     }
 
-    bool moveToKey(const TableTuple *searchKey) {
+    bool _moveToKey(const TableTuple *searchKey) {
         m_tmp1.setFromKey(searchKey);
-        return moveToKey(m_tmp1);
+        return moveToKeyPrivate(m_tmp1);
     }
 
-    bool moveToTuple(const TableTuple *searchTuple) {
+    bool _moveToTuple(const TableTuple *searchTuple) {
         m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
-        return moveToKey(m_tmp1);
+        return moveToKeyPrivate(m_tmp1);
     }
 
-    TableTuple nextValueAtKey() {
+    TableTuple _nextValueAtKey() {
         if (m_match.isNullTuple()) return m_match;
         TableTuple retval = m_match;
         ++(m_keyIter.first);
@@ -163,27 +171,21 @@ public:
         return retval;
     }
 
-    virtual void ensureCapacity(uint32_t capacity) {
+    virtual void _ensureCapacity(uint32_t capacity) {
         m_entries->rehash(capacity * 2);
     }
 
-    size_t getSize() const { return m_entries->size(); }
-    int64_t getMemoryEstimate() const {
-        return m_memoryEstimate;
-        // return m_entries->bytesAllocated();
-    }
-
-    std::string getTypeName() const { return "HashTableMultiMapIndex"; };
+    size_t _getSize() const { return m_entries->size(); }
 
     // print out info about lookup usage
-    virtual void printReport() {
+    virtual void _printReport() {
         TableIndex::printReport();
         std::cout << "  Loadfactor: " << m_entries->load_factor() << std::endl;
     }
 
 protected:
     HashTableMultiMapIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
+        LockBasedTableIndex(scheme),
         m_eq(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
@@ -212,7 +214,7 @@ protected:
         return false;
     }
 
-    bool moveToKey(const KeyType &key) {
+    bool moveToKeyPrivate(const KeyType &key) {
         ++m_lookups;
         m_keyIter = m_entries->equal_range(key);
         if (m_keyIter.first == m_keyIter.second) {

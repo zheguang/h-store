@@ -1985,16 +1985,12 @@ void AntiCacheEvictionManager::recordEvictedAccess(catalog::Table* catalogTable,
 }
 
 void AntiCacheEvictionManager::throwEvictionPreparedAccessException(const catalog::Table& table, const TableTuple& tuple) {
-  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s (%d)",
-            table.name().c_str(), 
-            table.relativeIndex());
+  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s", table.name().c_str());
   throw EvictionPreparedTupleAccessException(table.relativeIndex());
 }
 
 void AntiCacheEvictionManager::throwEvictionPreparedAccessException(const catalog::Table& table) {
-  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s (%d)",
-            table.name().c_str(), 
-            table.relativeIndex());
+  VOLT_INFO("Throwing EvictionPreparedTupleAccessException for table %s", table.name().c_str());
   throw EvictionPreparedTupleAccessException(table.relativeIndex());
 }
 

@@ -61,7 +61,7 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
-class BinaryTreeUniqueIndex : public TableIndex
+class BinaryTreeUniqueIndex : public LockBasedTableIndex
 {
     friend class TableIndexFactory;
 
@@ -76,167 +76,6 @@ public:
         delete m_allocator;
     };
 
-    bool addEntry(const TableTuple* tuple)
-    {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return addEntryPrivate(tuple, m_tmp1);
-    }
-
-    bool deleteEntry(const TableTuple* tuple)
-    {
-        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
-        return deleteEntryPrivate(m_tmp1);
-    }
-
-    bool replaceEntry(const TableTuple* oldTupleValue,
-                      const TableTuple* newTupleValue)
-    {
-        VOLT_TRACE("Do they ever replace Entry?\n");
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-        if (m_eq(m_tmp1, m_tmp2))
-        {
-            // no update is needed for this index
-            return true;
-        }
-
-        bool deleted = deleteEntryPrivate(m_tmp1);
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
-    }
-    
-    bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
-        // set the key from the tuple
-        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
-        ++m_updates; 
-        
-        m_entries->erase(m_anticacheTmp); 
-        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
-        return retval.second;
-    }
-
-    bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs)
-    {
-        m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
-        return !(m_eq(m_tmp1, m_tmp2));
-    }
-
-    bool exists(const TableTuple* values)
-    {
-        ++m_lookups;
-        m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
-        return (m_entries->find(m_tmp1) != m_entries->end());
-    }
-
-    bool moveToKey(const TableTuple* searchKey)
-    {
-        ++m_lookups;
-        m_begin = true;
-        m_tmp1.setFromKey(searchKey);
-        m_keyIter = m_entries->find(m_tmp1);
-        if (m_keyIter == m_entries->end()) {
-            m_match.move(NULL);
-            return false;
-        }
-        m_match.move(const_cast<void*>(m_keyIter->second));
-        return !m_match.isNullTuple();
-    }
-
-    bool moveToTuple(const TableTuple* searchTuple)
-    {
-        ++m_lookups;
-        m_begin = true;
-        m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
-        m_keyIter = m_entries->find(m_tmp1);
-        if (m_keyIter == m_entries->end()) {
-            m_match.move(NULL);
-            return false;
-        }
-        m_match.move(const_cast<void*>(m_keyIter->second));
-        return !m_match.isNullTuple();
-    }
-
-    void moveToKeyOrGreater(const TableTuple* searchKey)
-    {
-        ++m_lookups;
-        m_begin = true;
-        m_tmp1.setFromKey(searchKey);
-        m_keyIter = m_entries->lower_bound(m_tmp1);
-    }
-
-    void moveToGreaterThanKey(const TableTuple* searchKey)
-    {
-        ++m_lookups;
-        m_begin = true;
-        m_tmp1.setFromKey(searchKey);
-        m_keyIter = m_entries->upper_bound(m_tmp1);
-    }
-
-    void moveToEnd(bool begin)
-    {
-        ++m_lookups;
-        m_begin = begin;
-        if (begin)
-            m_keyIter = m_entries->begin();
-        else
-            m_keyRIter = m_entries->rbegin();
-    }
-
-    TableTuple nextValue()
-    {
-        TableTuple retval(m_tupleSchema);
-
-        if (m_begin) {
-            if (m_keyIter == m_entries->end())
-                return TableTuple();
-            retval.move(const_cast<void*>(m_keyIter->second));
-            ++m_keyIter;
-        } else {
-            if (m_keyRIter == (typename MapType::const_reverse_iterator) m_entries->rend())
-                return TableTuple();
-            retval.move(const_cast<void*>(m_keyRIter->second));
-            ++m_keyRIter;
-        }
-
-        return retval;
-    }
-
-    TableTuple nextValueAtKey()
-    {
-        TableTuple retval = m_match;
-        m_match.move(NULL);
-        return retval;
-    }
-
-    bool advanceToNextKey()
-    {
-        if (m_begin) {
-            ++m_keyIter;
-            if (m_keyIter == m_entries->end())
-            {
-                m_match.move(NULL);
-                return false;
-            }
-            m_match.move(const_cast<void*>(m_keyIter->second));
-        } else {
-            ++m_keyRIter;
-            if (m_keyRIter == (typename MapType::const_reverse_iterator) m_entries->rend())
-            {
-                m_match.move(NULL);
-                return false;
-            }
-            m_match.move(const_cast<void*>(m_keyRIter->second));
-        }
-
-        return !m_match.isNullTuple();
-    }
-
-    size_t getSize() const { return m_entries->size(); }
     int64_t getMemoryEstimate() const {
         /** Debug code
         printf("getMomoryEstimate called! %d %ld %lu\n", m_id, h_index::indexMemoryTable[m_id], h_index::indexMemoryTable.size());
@@ -265,9 +104,172 @@ public:
         std::string ret(buffer.str());
         return (ret);
     }
+
+private:
+    bool _addEntry(const TableTuple* tuple)
+    {
+        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
+        return addEntryPrivate(tuple, m_tmp1);
+    }
+
+    bool _deleteEntry(const TableTuple* tuple)
+    {
+        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
+        return deleteEntryPrivate(m_tmp1);
+    }
+
+    bool _replaceEntry(const TableTuple* oldTupleValue,
+                      const TableTuple* newTupleValue)
+    {
+        VOLT_TRACE("Do they ever replace Entry?\n");
+        // this can probably be optimized
+        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
+        if (m_eq(m_tmp1, m_tmp2))
+        {
+            // no update is needed for this index
+            return true;
+        }
+
+        bool deleted = deleteEntryPrivate(m_tmp1);
+        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
+        --m_deletes;
+        --m_inserts;
+        ++m_updates;
+        return (deleted && inserted);
+    }
+    
+    bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
+        // set the key from the tuple
+        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
+        ++m_updates; 
+        
+        m_entries->erase(m_anticacheTmp); 
+        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
+        return retval.second;
+    }
+
+    bool _checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs)
+    {
+        m_tmp1.setFromTuple(lhs, column_indices_, m_keySchema);
+        m_tmp2.setFromTuple(rhs, column_indices_, m_keySchema);
+        return !(m_eq(m_tmp1, m_tmp2));
+    }
+
+    bool _exists(const TableTuple* values)
+    {
+        ++m_lookups;
+        m_tmp1.setFromTuple(values, column_indices_, m_keySchema);
+        return (m_entries->find(m_tmp1) != m_entries->end());
+    }
+
+    bool _moveToKey(const TableTuple* searchKey)
+    {
+        ++m_lookups;
+        m_begin = true;
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries->find(m_tmp1);
+        if (m_keyIter == m_entries->end()) {
+            m_match.move(NULL);
+            return false;
+        }
+        m_match.move(const_cast<void*>(m_keyIter->second));
+        return !m_match.isNullTuple();
+    }
+
+    bool _moveToTuple(const TableTuple* searchTuple)
+    {
+        ++m_lookups;
+        m_begin = true;
+        m_tmp1.setFromTuple(searchTuple, column_indices_, m_keySchema);
+        m_keyIter = m_entries->find(m_tmp1);
+        if (m_keyIter == m_entries->end()) {
+            m_match.move(NULL);
+            return false;
+        }
+        m_match.move(const_cast<void*>(m_keyIter->second));
+        return !m_match.isNullTuple();
+    }
+
+    void _moveToKeyOrGreater(const TableTuple* searchKey)
+    {
+        ++m_lookups;
+        m_begin = true;
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries->lower_bound(m_tmp1);
+    }
+
+    void _moveToGreaterThanKey(const TableTuple* searchKey)
+    {
+        ++m_lookups;
+        m_begin = true;
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries->upper_bound(m_tmp1);
+    }
+
+    void _moveToEnd(bool begin)
+    {
+        ++m_lookups;
+        m_begin = begin;
+        if (begin)
+            m_keyIter = m_entries->begin();
+        else
+            m_keyRIter = m_entries->rbegin();
+    }
+
+    TableTuple _nextValue()
+    {
+        TableTuple retval(m_tupleSchema);
+
+        if (m_begin) {
+            if (m_keyIter == m_entries->end())
+                return TableTuple();
+            retval.move(const_cast<void*>(m_keyIter->second));
+            ++m_keyIter;
+        } else {
+            if (m_keyRIter == (typename MapType::const_reverse_iterator) m_entries->rend())
+                return TableTuple();
+            retval.move(const_cast<void*>(m_keyRIter->second));
+            ++m_keyRIter;
+        }
+
+        return retval;
+    }
+
+    TableTuple _nextValueAtKey()
+    {
+        TableTuple retval = m_match;
+        m_match.move(NULL);
+        return retval;
+    }
+
+    bool _advanceToNextKey()
+    {
+        if (m_begin) {
+            ++m_keyIter;
+            if (m_keyIter == m_entries->end())
+            {
+                m_match.move(NULL);
+                return false;
+            }
+            m_match.move(const_cast<void*>(m_keyIter->second));
+        } else {
+            ++m_keyRIter;
+            if (m_keyRIter == (typename MapType::const_reverse_iterator) m_entries->rend())
+            {
+                m_match.move(NULL);
+                return false;
+            }
+            m_match.move(const_cast<void*>(m_keyRIter->second));
+        }
+
+        return !m_match.isNullTuple();
+    }
+
+    size_t _getSize() const { return m_entries->size(); }
 protected:
     BinaryTreeUniqueIndex(const TableIndexScheme &scheme) :
-        TableIndex(scheme),
+        LockBasedTableIndex(scheme),
         m_begin(true),
         m_eq(m_keySchema)
     {

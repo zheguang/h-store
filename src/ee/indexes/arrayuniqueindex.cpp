@@ -28,7 +28,7 @@
 namespace voltdb {
 
 
-ArrayUniqueIndex::ArrayUniqueIndex(const TableIndexScheme &scheme) : TableIndex(scheme), num_entries_(0) {
+ArrayUniqueIndex::ArrayUniqueIndex(const TableIndexScheme &scheme) : LockBasedTableIndex(scheme), num_entries_(0) {
     assert(colCount_ == 1);
     assert((column_types_[0] == VALUE_TYPE_TINYINT) || (column_types_[0] == VALUE_TYPE_SMALLINT) ||
         (column_types_[0] == VALUE_TYPE_INTEGER) || (column_types_[0] == VALUE_TYPE_BIGINT));
@@ -41,7 +41,7 @@ ArrayUniqueIndex::~ArrayUniqueIndex() {
     delete[] entries_;
 }
 
-bool ArrayUniqueIndex::addEntry(const TableTuple *tuple) {
+bool ArrayUniqueIndex::_addEntry(const TableTuple *tuple) {
     const int32_t key = ValuePeeker::peekAsInteger(tuple->getNValue(column_indices_[0]));
     //VOLT_TRACE ("Adding entry %ld from column index %d", key, column_indices_[0]);
     assert((key < ARRAY_INDEX_INITIAL_SIZE) && (key >= 0));
@@ -55,7 +55,7 @@ bool ArrayUniqueIndex::addEntry(const TableTuple *tuple) {
     return true;
 }
 
-bool ArrayUniqueIndex::deleteEntry(const TableTuple *tuple) {
+bool ArrayUniqueIndex::_deleteEntry(const TableTuple *tuple) {
     const int32_t key = ValuePeeker::peekAsInteger(tuple->getNValue(column_indices_[0]));
     assert((key < ARRAY_INDEX_INITIAL_SIZE) && (key >= 0));
 
@@ -69,7 +69,7 @@ bool ArrayUniqueIndex::deleteEntry(const TableTuple *tuple) {
     return true; //deleted
 }
 
-bool ArrayUniqueIndex::replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
+bool ArrayUniqueIndex::_replaceEntry(const TableTuple *oldTupleValue, const TableTuple* newTupleValue) {
     // this can probably be optimized
     int32_t old_key = ValuePeeker::peekAsInteger(oldTupleValue->getNValue(column_indices_[0]));
     int32_t new_key = ValuePeeker::peekAsInteger(newTupleValue->getNValue(column_indices_[0]));
@@ -83,7 +83,7 @@ bool ArrayUniqueIndex::replaceEntry(const TableTuple *oldTupleValue, const Table
     return true;
 }
     
-bool ArrayUniqueIndex::setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress)
+bool ArrayUniqueIndex::_setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress)
 {
     int32_t key = ValuePeeker::peekAsInteger(tuple->getNValue(column_indices_[0]));
     
@@ -98,7 +98,7 @@ bool ArrayUniqueIndex::setEntryToNewAddress(const TableTuple *tuple, const void*
     return true; 
 }
 
-bool ArrayUniqueIndex::exists(const TableTuple* values) {
+bool ArrayUniqueIndex::_exists(const TableTuple* values) {
     int32_t key = ValuePeeker::peekAsInteger(values->getNValue(column_indices_[0]));
     //VOLT_DEBUG("Exists?: %lld", key);
     assert(key < ARRAY_INDEX_INITIAL_SIZE);
@@ -109,7 +109,7 @@ bool ArrayUniqueIndex::exists(const TableTuple* values) {
     return entries_[key] != NULL;
 }
 
-bool ArrayUniqueIndex::moveToKey(const TableTuple *searchKey) {
+bool ArrayUniqueIndex::_moveToKey(const TableTuple *searchKey) {
     match_i_ = ValuePeeker::peekAsInteger(searchKey->getNValue(0));
     if (match_i_ < 0) return false;
     assert(match_i_ < ARRAY_INDEX_INITIAL_SIZE);
@@ -117,7 +117,7 @@ bool ArrayUniqueIndex::moveToKey(const TableTuple *searchKey) {
     return entries_[match_i_];
 }
 
-bool ArrayUniqueIndex::moveToTuple(const TableTuple *searchTuple) {
+bool ArrayUniqueIndex::_moveToTuple(const TableTuple *searchTuple) {
     match_i_ = ValuePeeker::peekAsInteger(searchTuple->getNValue(0));
     if (match_i_ < 0) return false;
     assert(match_i_ < ARRAY_INDEX_INITIAL_SIZE);
@@ -125,7 +125,7 @@ bool ArrayUniqueIndex::moveToTuple(const TableTuple *searchTuple) {
     return entries_[match_i_];
 }
 
-TableTuple ArrayUniqueIndex::nextValueAtKey() {
+TableTuple ArrayUniqueIndex::_nextValueAtKey() {
     if (match_i_ == -1) return TableTuple();
     if (!(entries_[match_i_])) return TableTuple();
     TableTuple retval(m_tupleSchema);
@@ -134,12 +134,12 @@ TableTuple ArrayUniqueIndex::nextValueAtKey() {
     return retval;
 }
 
-bool ArrayUniqueIndex::advanceToNextKey() {
+bool ArrayUniqueIndex::_advanceToNextKey() {
     assert((match_i_ < ARRAY_INDEX_INITIAL_SIZE) && (match_i_ >= 0));
     return entries_[++match_i_];
 }
 
-bool ArrayUniqueIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+bool ArrayUniqueIndex::_checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
     return lhs->getNValue(column_indices_[0]).op_notEquals(rhs->getNValue(column_indices_[0])).isTrue();
 }
 
