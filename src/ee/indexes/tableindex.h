@@ -46,7 +46,7 @@
 #ifndef HSTORETABLEINDEX_H
 #define HSTORETABLEINDEX_H
 
-#include <pthread.h>
+//#include <pthread.h>
 #include <vector>
 #include <string>
 #include "boost/shared_ptr.hpp"
@@ -354,140 +354,151 @@ protected:
 class LockBasedTableIndex : public TableIndex {
   public:
     virtual ~LockBasedTableIndex() {
-      pthread_mutex_destroy(&m_anticacheLock);
+      //pthread_mutex_destroy(&m_anticacheLock);
     }
 
     bool addEntry(const TableTuple *tuple) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _addEntry(tuple);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     bool deleteEntry(const TableTuple *tuple) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _deleteEntry(tuple);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     bool replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _replaceEntry(oldTupleValue, newTupleValue);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
     
     bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _setEntryToNewAddress(tuple, address, oldAddress);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
     
     bool exists(const TableTuple* values) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _exists(values);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     bool moveToKey(const TableTuple *searchKey) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _moveToKey(searchKey);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     bool moveToTuple(const TableTuple *searchTuple) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _moveToTuple(searchTuple);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     TableTuple nextValueAtKey() {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       TableTuple result = _nextValueAtKey();
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     bool advanceToNextKey() {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _advanceToNextKey();
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     };
 
     void moveToKeyOrGreater(const TableTuple *searchKey) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       _moveToKeyOrGreater(searchKey);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
     };
 
     void moveToGreaterThanKey(const TableTuple *searchKey) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       _moveToGreaterThanKey(searchKey);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
     };
 
     void moveToEnd(bool begin) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       _moveToEnd(begin);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
     }
 
     TableTuple nextValue() {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       TableTuple result = _nextValue();
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     };
 
     bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       bool result = _checkForIndexChange(lhs, rhs);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
 
     size_t getSize() const {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       size_t result = _getSize();
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
       return result;
     }
     
     void ensureCapacity(uint32_t capacity) {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       _ensureCapacity(capacity);
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
     }
 
     // print out info about lookup usage
     void printReport() {
-      pthread_mutex_lock(&m_anticacheLock);
+      lock();
       _printReport();
-      pthread_mutex_unlock(&m_anticacheLock);
+      unlock();
     }
 
   protected:
     LockBasedTableIndex(const TableIndexScheme &scheme):
       TableIndex(scheme)
       {
-        pthread_mutexattr_init(&m_anticacheLockAttr);
-        pthread_mutexattr_settype(&m_anticacheLockAttr, PTHREAD_MUTEX_RECURSIVE);
-        if (pthread_mutex_init(&m_anticacheLock, &m_anticacheLockAttr) != 0) {
-          throwFatalException("Anticache lock init failed.");
-        }
-
-        //if (pthread_mutex_init(&m_anticacheLock, NULL) != 0) {
-        //  throwFatalException("Anticache lock init failed.");
-        //}
+        initLock();
       }
 
   private:
+    struct TASLock {
+      bool state;
+    };
+
+    void initLock() const {
+      m_anticacheLock.state = 0;
+    }
+
+    void lock() const {
+      //pthread_mutex_lock(&m_anticacheLock);
+      while (__atomic_test_and_set(&(m_anticacheLock.state), __ATOMIC_SEQ_CST) == 1) {
+      }
+    }
+
+    void unlock() const {
+      //pthread_mutex_unlock(&m_anticacheLock);
+      __atomic_clear(&(m_anticacheLock.state), __ATOMIC_SEQ_CST);
+    }
+
     virtual bool _addEntry(const TableTuple *tuple) = 0;
     virtual bool _deleteEntry(const TableTuple *tuple) = 0;
     virtual bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) = 0;
@@ -517,8 +528,7 @@ class LockBasedTableIndex : public TableIndex {
         throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
     };
 
-    mutable pthread_mutex_t m_anticacheLock;
-    mutable pthread_mutexattr_t m_anticacheLockAttr;
+    mutable TASLock m_anticacheLock;
 };
 
 }
