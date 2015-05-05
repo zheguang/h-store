@@ -485,18 +485,24 @@ class LockBasedTableIndex : public TableIndex {
     };
 
     void initLock() const {
+#ifdef ANTICACHE
       m_anticacheLock.state = 0;
+#endif
     }
 
     void lock() const {
+#ifdef ANTICACHE
       //pthread_mutex_lock(&m_anticacheLock);
       while (__atomic_test_and_set(&(m_anticacheLock.state), __ATOMIC_SEQ_CST) == 1) {
       }
+#endif
     }
 
     void unlock() const {
+#ifdef ANTICACHE
       //pthread_mutex_unlock(&m_anticacheLock);
       __atomic_clear(&(m_anticacheLock.state), __ATOMIC_SEQ_CST);
+#endif
     }
 
     virtual bool _addEntry(const TableTuple *tuple) = 0;
@@ -528,7 +534,9 @@ class LockBasedTableIndex : public TableIndex {
         throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
     };
 
+#ifdef ANTICACHE
     mutable TASLock m_anticacheLock;
+#endif
 };
 
 }
