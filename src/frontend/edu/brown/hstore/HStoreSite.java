@@ -1075,8 +1075,8 @@ public class HStoreSite implements VoltProcedureListener.Handler, Shutdownable, 
                         TimeUnit.MILLISECONDS);
                 threadManager.schedulePeriodicWork(
                         anticacheManager.getEvictionPreparedAccessTxnsResubmitter(),
-                        1001,
-                        1001,
+                        hstore_conf.site.anticache_eviction_conflict_restart_interval,
+                        hstore_conf.site.anticache_eviction_conflict_restart_interval,
                         TimeUnit.MILLISECONDS);
             } else {
                 LOG.warn("There are no tables marked as evictable. Disabling anti-cache monitoring");

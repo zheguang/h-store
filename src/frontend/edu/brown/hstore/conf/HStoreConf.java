@@ -701,6 +701,15 @@ public final class HStoreConf {
             experimental=true
         )
         public int anticache_check_interval;
+
+        @ConfigProperty(
+            description="How often in milliseconds should the AntiCacheManager restart " +
+                        "any conflicting trasactions in conflict with asynchronous " +
+                        "eviction.",
+            defaultInt=1001,
+            experimental=true
+        )
+        public int anticache_eviction_conflict_restart_interval;
         
         @ConfigProperty(
                 description="Memory usage threshold, in MB, at which to start evicting",
