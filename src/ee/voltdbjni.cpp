@@ -1604,7 +1604,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeAntiC
     if (engine == NULL) {
         return result;
     }
-    //engine->resetAntiCacheUtilityOutputBuffer();
 
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
@@ -1621,7 +1620,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeAntiC
     if (engine == NULL) {
         return result;
     }
-    //engine->resetAntiCacheUtilityOutputBuffer();
 
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
@@ -1662,9 +1660,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeAntiC
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) return (retval);
 
-    //engine->resetReusedResultOutputBuffer();
-    //engine->resetAntiCacheUtilityOutputBuffer();
-    
     try {
         retval = engine->antiCacheEvictBlock(static_cast<int32_t>(tableId), static_cast<long>(blockSize), static_cast<int>(numBlocks));
     } catch (FatalException e) {
@@ -1687,9 +1682,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeAntiC
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) return (retval);
-
-    //engine->resetReusedResultOutputBuffer();
-    //engine->resetAntiCacheUtilityOutputBuffer();
 
     try {
         retval = engine->antiCacheEvictBlockInBatch(static_cast<int32_t>(tableId), static_cast<int32_t>(childTableId), static_cast<long>(blockSize), static_cast<int>(numBlocks));

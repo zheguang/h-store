@@ -384,7 +384,7 @@ public class AntiCacheManager extends AbstractProcessingRunnable<AntiCacheManage
     protected void processingCallback(QueueEntry next) {
         if (next instanceof UnevictionQueueEntry) {
             if (isEvictionPreparing.get()) {
-                LOG.info("Requeueing uneviction request because ongoing eviction.");
+                LOG.warn("Requeueing uneviction request because ongoing eviction.");
                 queue.offer(next);
             } else {
                 process((UnevictionQueueEntry) next);
