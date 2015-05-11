@@ -2138,6 +2138,7 @@ int VoltDBEngine::antiCacheEvictBlockWork(int64_t prepareTxnId, int32_t tableId,
             throwFatalException("Invalid table id %d", tableId);
         }
 
+        resetAntiCacheUtilityOutputBuffer();
         size_t lengthPosition = m_antiCacheUtilityOutput.reserveBytes(sizeof(int32_t));
         Table *resultTable = antiCacheManager->evictBlockWork(prepareTxnId, table, blockSize, numBlocks);
         if (resultTable) {
@@ -2172,6 +2173,7 @@ int VoltDBEngine::antiCacheEvictBlockWorkInBatch(int64_t prepareTxnId, int32_t t
             throwFatalException("Invalid table id %d", childTableId);
         }
 
+        resetAntiCacheUtilityOutputBuffer();
         size_t lengthPosition = m_antiCacheUtilityOutput.reserveBytes(sizeof(int32_t));
         Table *resultTable = antiCacheManager->evictBlockWorkInBatch(prepareTxnId, table, childTable, blockSize, numBlocks);
         if (resultTable) {
