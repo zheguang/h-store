@@ -490,18 +490,31 @@ class LockBasedTableIndex : public TableIndex {
 #endif
     }
 
+#define GCC_VERSION (__GNUC__ * 10000 \
+    + __GNUC_MINOR__ * 100 \
+    + __GNUC_PATCHLEVEL__)
+
     void lock() const {
 #ifdef ANTICACHE
       //pthread_mutex_lock(&m_anticacheLock);
+#if GCC_VERSION >= 40700
       while (__atomic_test_and_set(&(m_anticacheLock.state), __ATOMIC_SEQ_CST) == 1) {
       }
+#else
+      while (__sync_lock_test_and_set(&(m_anticacheLock.state), 1) == 1) {
+      }
+#endif
 #endif
     }
 
     void unlock() const {
 #ifdef ANTICACHE
       //pthread_mutex_unlock(&m_anticacheLock);
+#if GCC_VERSION >= 40700
       __atomic_clear(&(m_anticacheLock.state), __ATOMIC_SEQ_CST);
+#else
+      __sync_lock_release(&(m_anticacheLock.state));
+#endif
 #endif
     }
 
