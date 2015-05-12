@@ -39,7 +39,7 @@ const int ARRAY_INDEX_INITIAL_SIZE = 131072; // (2^17)
  * as the entry value is assured to be sequential and limited to a small number.
  * @see TableIndex
  */
-class ArrayUniqueIndex : public LockBasedTableIndex {
+class ArrayUniqueIndex : public TableIndex {
     friend class TableIndexFactory;
 
     public:

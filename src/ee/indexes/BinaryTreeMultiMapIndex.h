@@ -59,7 +59,7 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
-class BinaryTreeMultiMapIndex : public LockBasedTableIndex
+class BinaryTreeMultiMapIndex : public TableIndex
 {
 
 
@@ -124,12 +124,12 @@ private:
     }
     
     bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
-        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
+        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates; 
         
 //        int i = 0; 
         std::pair<MMIter,MMIter> key_iter;
-        for (key_iter = m_entries->equal_range(m_anticacheTmp);
+        for (key_iter = m_entries->equal_range(m_tmp1);
              key_iter.first != key_iter.second;
              ++(key_iter.first))
         {
@@ -141,7 +141,7 @@ private:
                 //std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
                 //return retval.second;
 
-                m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
+                m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
                 return true;
             }
         }
@@ -249,7 +249,7 @@ private:
 
 protected:
     BinaryTreeMultiMapIndex(const TableIndexScheme &scheme) :
-        LockBasedTableIndex(scheme),
+        TableIndex(scheme),
         m_begin(true),
         m_eq(m_keySchema)
     {
@@ -302,7 +302,6 @@ protected:
     AllocatorType *m_allocator;
     KeyType m_tmp1;
     KeyType m_tmp2;
-    KeyType m_anticacheTmp;
 
     // iteration stuff
     bool m_begin;

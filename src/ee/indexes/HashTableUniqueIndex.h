@@ -57,7 +57,7 @@ namespace voltdb {
  * @see TableIndex
  */
 template<typename KeyType, class KeyHasher, class KeyEqualityChecker>
-class HashTableUniqueIndex : public LockBasedTableIndex {
+class HashTableUniqueIndex : public TableIndex {
     friend class TableIndexFactory;
 
     typedef h_index::AllocatorTracker<pair<const KeyType, const void*> > AllocatorType;    
@@ -107,13 +107,13 @@ private:
     
     bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void *oldAddress) {
         // set the key from the tuple 
-        m_anticacheTmp.setFromTuple(tuple, column_indices_, m_keySchema);
+        m_tmp1.setFromTuple(tuple, column_indices_, m_keySchema);
         ++m_updates;
         
         // erase the entry and add a entry with the same key and a NULL value
-        bool deleted = deleteEntryPrivate(m_anticacheTmp);
+        bool deleted = deleteEntryPrivate(m_tmp1);
 //        m_entries->erase(m_tmp1); 
-        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_anticacheTmp, address));
+        std::pair<typename MapType::iterator, bool> retval = m_entries->insert(std::pair<KeyType, const void*>(m_tmp1, address));
         return (retval.second & deleted);
     }
 
@@ -168,7 +168,7 @@ private:
 
 protected:
     HashTableUniqueIndex(const TableIndexScheme &scheme) :
-        LockBasedTableIndex(scheme),
+        TableIndex(scheme),
         m_eq(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
@@ -198,7 +198,6 @@ protected:
     AllocatorType *m_allocator;
     KeyType m_tmp1;
     KeyType m_tmp2;
-    KeyType m_anticacheTmp;
 
     // iteration stuff
     typename MapType::const_iterator m_keyIter;

@@ -28,7 +28,7 @@
 namespace voltdb {
 
 
-ArrayUniqueIndex::ArrayUniqueIndex(const TableIndexScheme &scheme) : LockBasedTableIndex(scheme), num_entries_(0) {
+ArrayUniqueIndex::ArrayUniqueIndex(const TableIndexScheme &scheme) : TableIndex(scheme), num_entries_(0) {
     assert(colCount_ == 1);
     assert((column_types_[0] == VALUE_TYPE_TINYINT) || (column_types_[0] == VALUE_TYPE_SMALLINT) ||
         (column_types_[0] == VALUE_TYPE_INTEGER) || (column_types_[0] == VALUE_TYPE_BIGINT));

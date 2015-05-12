@@ -392,39 +392,39 @@ void PersistentTable::clearMergeTupleOffsets()
 int64_t PersistentTable::unevictTuple(ReferenceSerializeInput * in, int j, int merge_tuple_offset){
     TableTuple evicted_tuple = m_evictedTable->tempTuple();
     // get a free tuple and increment the count of tuples current used
-    nextFreeTuple(&m_tmpAnticacheTarget1);
+    nextFreeTuple(&m_tmpTarget1);
     m_tupleCount++;
 
     // deserialize tuple from unevicted block
-    int64_t bytesUnevicted = m_tmpAnticacheTarget1.deserializeWithHeaderFrom(*in);
+    int64_t bytesUnevicted = m_tmpTarget1.deserializeWithHeaderFrom(*in);
 
 
     // Note, this goal of the section below is to get a tuple that points to the tuple in the EvictedTable and has the
     // schema of the evicted tuple. However, the lookup has to be done using the schema of the original (unevicted) version
-    m_tmpAnticacheTarget2 = lookupTuple(m_tmpAnticacheTarget1);       // lookup the tuple in the table
-    evicted_tuple.move(m_tmpAnticacheTarget2.address());
+    m_tmpTarget2 = lookupTuple(m_tmpTarget1);       // lookup the tuple in the table
+    evicted_tuple.move(m_tmpTarget2.address());
     static_cast<EvictedTable*>(m_evictedTable)->deleteEvictedTuple(evicted_tuple);             // delete the EvictedTable tuple
 
-    m_tmpAnticacheTarget1.setEvictedFalse();
-    m_tmpAnticacheTarget1.setDeletedFalse();
+    m_tmpTarget1.setEvictedFalse();
+    m_tmpTarget1.setDeletedFalse();
     // update the indexes to point to this newly unevicted tuple
-    VOLT_DEBUG("BEFORE: tuple.isEvicted() = %d", m_tmpAnticacheTarget1.isEvicted());
-    setEntryToNewAddressForAllIndexes(&m_tmpAnticacheTarget1, m_tmpAnticacheTarget1.address(), m_tmpAnticacheTarget2.address());
-    updateStringMemory((int)m_tmpAnticacheTarget1.getNonInlinedMemorySize());
+    VOLT_DEBUG("BEFORE: tuple.isEvicted() = %d", m_tmpTarget1.isEvicted());
+    setEntryToNewAddressForAllIndexes(&m_tmpTarget1, m_tmpTarget1.address(), m_tmpTarget2.address());
+    updateStringMemory((int)m_tmpTarget1.getNonInlinedMemorySize());
 
     //deleteFromAllIndexes(&m_tmpTarget1);
     //insertTuple(m_tmpTarget1);
 
-    m_tmpAnticacheTarget1.setEvictedFalse();
-    VOLT_DEBUG("AFTER: tuple.isEvicted() = %d", m_tmpAnticacheTarget1.isEvicted());
-    VOLT_DEBUG("Merged Tuple: %s", m_tmpAnticacheTarget1.debug(name()).c_str());
+    m_tmpTarget1.setEvictedFalse();
+    VOLT_DEBUG("AFTER: tuple.isEvicted() = %d", m_tmpTarget1.isEvicted());
+    VOLT_DEBUG("Merged Tuple: %s", m_tmpTarget1.debug(name()).c_str());
     //VOLT_INFO("tuple size: %d, non-inlined memory size: %d", m_tmpTarget1.tupleLength(), m_tmpTarget1.getNonInlinedMemorySize());
     AntiCacheEvictionManager* eviction_manager = m_executorContext->getAntiCacheEvictionManager();
     // re-insert the tuple back into the eviction chain
     if(j == merge_tuple_offset)  // put it at the back of the chain
-        eviction_manager->updateTuple(this, &m_tmpAnticacheTarget1, true);
+        eviction_manager->updateTuple(this, &m_tmpTarget1, true);
     else
-        eviction_manager->updateUnevictedTuple(this, &m_tmpAnticacheTarget1);
+        eviction_manager->updateUnevictedTuple(this, &m_tmpTarget1);
     return bytesUnevicted;
 }
 

@@ -71,6 +71,8 @@ TableIndex::TableIndex(const TableIndexScheme &scheme) : m_scheme(scheme), m_sta
     // initialize memory size to zero
     m_memoryEstimate = 0;
 
+    initLock();
+
     VOLT_TRACE("Index created2: %s %d\n", getName().c_str(), m_id);
 }
 
@@ -109,7 +111,7 @@ std::string TableIndex::debug() const
     return (ret);
 }
 
-void TableIndex::printReport()
+void TableIndex::_printReport()
 {
     std::cout << name_ << ",";
     std::cout << getTypeName() << ",";

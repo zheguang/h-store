@@ -189,11 +189,6 @@ bool AntiCacheEvictionManager::updateUnevictedTuple(PersistentTable* table, Tabl
 }
     
 bool AntiCacheEvictionManager::updateTuple(PersistentTable* table, TableTuple* tuple, bool is_insert) {
-    if (hasInitEvictionPreparation() && isMarkedToEvict(*table, *tuple)) {
-      //throwFatalException("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
-      VOLT_INFO("In AntiCacheEvictionManager::updateTuple: tuple already marked to evict, is_insert(%d)", is_insert);
-    }
-    
     if (table->getEvictedTable() == NULL || table->isBatchEvicted())  // no need to maintain chain for non-evictable tables or batch evicted tables
         return true; 
 

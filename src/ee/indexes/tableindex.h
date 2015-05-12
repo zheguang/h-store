@@ -128,235 +128,6 @@ class TableIndex
 public:
     virtual ~TableIndex();
 
-    /**
-     * adds passed value as an index entry linked to given tuple
-     */
-    virtual bool addEntry(const TableTuple *tuple) = 0;
-
-    /**
-     * removes the index entry linked to given value (and tuple
-     * pointer, if it's non-unique index).
-     */
-    virtual bool deleteEntry(const TableTuple *tuple) = 0;
-
-    /**
-     * removes the index entry linked to old value and re-link it to new value.
-     * The address of the newTupleValue is used as the value in the index (and multimaps) as
-     * well as the key for the new entry.
-     */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
-    
-    virtual bool setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) = 0; 
-    
-    
-    /**
-     * just returns whether the value is already stored. no
-     * modification occurs.
-     */
-    virtual bool exists(const TableTuple* values) = 0;
-
-    /**
-     * This method moves to the first tuple equal to given key.  To
-     * iterate through all entries with the key (if non-unique index)
-     * or all entries that follow the entry, use nextValueAtKey() and
-     * advanceToNextKey().
-     *
-     * This method can be used <b>only for perfect matching</b> in
-     * which the whole search key matches with at least one entry in
-     * this index.  For example,
-     * (a,b,c)=(1,3,2),(1,3,3),(2,1,2),(2,1,3)....
-     *
-     * This method works for "WHERE a=2 AND b=1 AND c>=2", but does
-     * not work for "WHERE a=2 AND b=1 AND c>=1". For partial index
-     * search, use moveToKeyOrGreater.
-     *
-     * @see searchKey the value to be searched. this is NOT tuple
-     * data, but chosen values for this index. So, searchKey has to
-     * contain values in this index's entry order.
-     *
-     * @see moveToKeyOrGreater(const TableTuple *)
-     * @return true if the value is found. false if not.
-     */
-    virtual bool moveToKey(const TableTuple *searchKey) = 0;
-
-    /**
-     * Find location of the specified tuple in the tuple
-     */
-    virtual bool moveToTuple(const TableTuple *searchTuple) = 0;
-
-    /**
-     * sets the tuple to point the entry found by moveToKey().  calls
-     * this repeatedly to get all entries with the search key (for
-     * non-unique index).
-     *
-     * @return true if any entry to return, false if not.
-     */
-    virtual TableTuple nextValueAtKey() = 0;
-
-    /**
-     * sets the tuple to point the entry next to the one found by
-     * moveToKey().  calls this repeatedly to get all entries
-     * following to the search key (for range query).
-     *
-     * HOWEVER, this can't be used for partial index search. You can
-     * use this only when you in advance know that there is at least
-     * one entry that perfectly matches with the search key. In other
-     * word, this method SHOULD NOT BE USED in future because there
-     * isn't such a case for range query except for cheating case
-     * (i.e. TPCC slev which assumes there is always "OID-20" entry).
-     *
-     * @return true if any entry to return, false if not.
-     */
-    virtual bool advanceToNextKey()
-    {
-        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
-    };
-
-    /**
-     * This method moves to the first tuple equal or greater than
-     * given key.  Use this with nextValue(). This method works for
-     * partial index search where following value might not match with
-     * any entry in this index.
-     *
-     * @see searchKey the value to be searched. this is NOT tuple
-     *      data, but chosen values for this index.  So, searchKey has
-     *      to contain values in this index's entry order.
-     */
-    virtual void moveToKeyOrGreater(const TableTuple *searchKey)
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
-    };
-
-    /**
-     * This method moves to the first tuple greater than given key.
-     * Use this with nextValue().
-     *
-     * @see searchKey the value to be searched. this is NOT tuple
-     *      data, but chosen values for this index.  So, searchKey has
-     *      to contain values in this index's entry order.
-     */
-    virtual void moveToGreaterThanKey(const TableTuple *searchKey)
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
-    };
-
-    /**
-     * This method moves to the beginning or the end of the indexes.
-     * Use this with nextValue().
-     *
-     * @see begin true to move to the beginning, false to the end.
-     */
-    virtual void moveToEnd(bool begin)
-    {
-        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
-    }
-
-    /**
-     * sets the tuple to point the entry found by
-     * moveToKeyOrGreater().  calls this repeatedly to get all entries
-     * with or following to the search key.
-     *
-     * @return true if any entry to return, false if reached the end
-     * of this index.
-     */
-    virtual TableTuple nextValue()
-    {
-        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
-    };
-
-    /**
-     * @return true if lhs is different from rhs in this index, which
-     * means replaceEntry has to follow.
-     */
-    virtual bool checkForIndexChange(const TableTuple *lhs,
-                                     const TableTuple *rhs) = 0;
-
-    /**
-     * Currently, UniqueIndex is just a TableIndex with additional checks.
-     * We might have to make a different class in future for maximizing
-     * performance of UniqueIndex.
-     */
-    inline bool isUniqueIndex() const {
-        return is_unique_index_;
-    }
-
-    virtual size_t getSize() const = 0;
-
-    // Return the amount of memory we think is allocated for this
-    // index.
-    virtual int64_t getMemoryEstimate() const = 0;
-    
-    const std::vector<int>& getColumnIndices() const {
-        return column_indices_vector_;
-    }
-
-    const std::vector<ValueType>& getColumnTypes() const {
-        return column_types_vector_;
-    }
-
-    int getColumnCount() const {
-        return colCount_;
-    }
-
-    const std::string& getName() const {
-        return name_;
-    }
-
-    const TupleSchema * getKeySchema() const {
-        return m_keySchema;
-    }
-
-    virtual std::string debug() const;
-    virtual std::string getTypeName() const = 0;
-
-    virtual void ensureCapacity(uint32_t capacity) {}
-
-    // print out info about lookup usage
-    virtual void printReport();
-
-    //TODO Useful implementation of == operator.
-    virtual bool equals(const TableIndex *other) const;
-
-    TableIndexScheme getScheme() const {
-        return m_scheme;
-    }
-    
-    virtual voltdb::IndexStats* getIndexStats();
-
-protected:
-    TableIndex(const TableIndexScheme &scheme);
-
-    const TableIndexScheme m_scheme;
-    TupleSchema* m_keySchema;
-    std::string name_;
-    std::vector<int> column_indices_vector_;
-    std::vector<ValueType> column_types_vector_;
-    ValueType* column_types_;
-    int colCount_;
-    bool is_unique_index_;
-    int* column_indices_;
-
-    // counters
-    int m_lookups;
-    int m_inserts;
-    int m_deletes;
-    int m_updates;
-    TupleSchema *m_tupleSchema;
-    
-    // stats
-    IndexStats m_stats;
-
-    // index memory size
-    int64_t m_memoryEstimate;
-};
-
-class LockBasedTableIndex : public TableIndex {
-  public:
-    virtual ~LockBasedTableIndex() {
-      //pthread_mutex_destroy(&m_anticacheLock);
-    }
-
     bool addEntry(const TableTuple *tuple) {
       lock();
       bool result = _addEntry(tuple);
@@ -472,27 +243,246 @@ class LockBasedTableIndex : public TableIndex {
       unlock();
     }
 
-  protected:
-    LockBasedTableIndex(const TableIndexScheme &scheme):
-      TableIndex(scheme)
-      {
-        initLock();
-      }
+    /**
+     * adds passed value as an index entry linked to given tuple
+     */
+    virtual bool _addEntry(const TableTuple *tuple) = 0;
+
+    /**
+     * removes the index entry linked to given value (and tuple
+     * pointer, if it's non-unique index).
+     */
+    virtual bool _deleteEntry(const TableTuple *tuple) = 0;
+
+    /**
+     * removes the index entry linked to old value and re-link it to new value.
+     * The address of the newTupleValue is used as the value in the index (and multimaps) as
+     * well as the key for the new entry.
+     */
+    virtual bool _replaceEntry(const TableTuple *oldTupleValue,
+                              const TableTuple *newTupleValue) = 0;
+    
+    virtual bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) = 0; 
+    
+    
+    /**
+     * just returns whether the value is already stored. no
+     * modification occurs.
+     */
+    virtual bool _exists(const TableTuple* values) = 0;
+
+    /**
+     * This method moves to the first tuple equal to given key.  To
+     * iterate through all entries with the key (if non-unique index)
+     * or all entries that follow the entry, use nextValueAtKey() and
+     * advanceToNextKey().
+     *
+     * This method can be used <b>only for perfect matching</b> in
+     * which the whole search key matches with at least one entry in
+     * this index.  For example,
+     * (a,b,c)=(1,3,2),(1,3,3),(2,1,2),(2,1,3)....
+     *
+     * This method works for "WHERE a=2 AND b=1 AND c>=2", but does
+     * not work for "WHERE a=2 AND b=1 AND c>=1". For partial index
+     * search, use moveToKeyOrGreater.
+     *
+     * @see searchKey the value to be searched. this is NOT tuple
+     * data, but chosen values for this index. So, searchKey has to
+     * contain values in this index's entry order.
+     *
+     * @see moveToKeyOrGreater(const TableTuple *)
+     * @return true if the value is found. false if not.
+     */
+    virtual bool _moveToKey(const TableTuple *searchKey) = 0;
+
+    /**
+     * Find location of the specified tuple in the tuple
+     */
+    virtual bool _moveToTuple(const TableTuple *searchTuple) = 0;
+
+    /**
+     * sets the tuple to point the entry found by moveToKey().  calls
+     * this repeatedly to get all entries with the search key (for
+     * non-unique index).
+     *
+     * @return true if any entry to return, false if not.
+     */
+    virtual TableTuple _nextValueAtKey() = 0;
+
+    /**
+     * sets the tuple to point the entry next to the one found by
+     * moveToKey().  calls this repeatedly to get all entries
+     * following to the search key (for range query).
+     *
+     * HOWEVER, this can't be used for partial index search. You can
+     * use this only when you in advance know that there is at least
+     * one entry that perfectly matches with the search key. In other
+     * word, this method SHOULD NOT BE USED in future because there
+     * isn't such a case for range query except for cheating case
+     * (i.e. TPCC slev which assumes there is always "OID-20" entry).
+     *
+     * @return true if any entry to return, false if not.
+     */
+    virtual bool _advanceToNextKey()
+    {
+        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
+    };
+
+    /**
+     * This method moves to the first tuple equal or greater than
+     * given key.  Use this with nextValue(). This method works for
+     * partial index search where following value might not match with
+     * any entry in this index.
+     *
+     * @see searchKey the value to be searched. this is NOT tuple
+     *      data, but chosen values for this index.  So, searchKey has
+     *      to contain values in this index's entry order.
+     */
+    virtual void _moveToKeyOrGreater(const TableTuple *searchKey)
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
+    };
+
+    /**
+     * This method moves to the first tuple greater than given key.
+     * Use this with nextValue().
+     *
+     * @see searchKey the value to be searched. this is NOT tuple
+     *      data, but chosen values for this index.  So, searchKey has
+     *      to contain values in this index's entry order.
+     */
+    virtual void _moveToGreaterThanKey(const TableTuple *searchKey)
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
+    };
+
+    /**
+     * This method moves to the beginning or the end of the indexes.
+     * Use this with nextValue().
+     *
+     * @see begin true to move to the beginning, false to the end.
+     */
+    virtual void _moveToEnd(bool begin)
+    {
+        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
+    }
+
+    /**
+     * sets the tuple to point the entry found by
+     * moveToKeyOrGreater().  calls this repeatedly to get all entries
+     * with or following to the search key.
+     *
+     * @return true if any entry to return, false if reached the end
+     * of this index.
+     */
+    virtual TableTuple _nextValue()
+    {
+        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
+    };
+
+    /**
+     * @return true if lhs is different from rhs in this index, which
+     * means replaceEntry has to follow.
+     */
+    virtual bool _checkForIndexChange(const TableTuple *lhs,
+                                     const TableTuple *rhs) = 0;
+
+    /**
+     * Currently, UniqueIndex is just a TableIndex with additional checks.
+     * We might have to make a different class in future for maximizing
+     * performance of UniqueIndex.
+     */
+    inline bool isUniqueIndex() const {
+        return is_unique_index_;
+    }
+
+    virtual size_t _getSize() const = 0;
+
+    // Return the amount of memory we think is allocated for this
+    // index.
+    virtual int64_t getMemoryEstimate() const = 0;
+    
+    const std::vector<int>& getColumnIndices() const {
+        return column_indices_vector_;
+    }
+
+    const std::vector<ValueType>& getColumnTypes() const {
+        return column_types_vector_;
+    }
+
+    int getColumnCount() const {
+        return colCount_;
+    }
+
+    const std::string& getName() const {
+        return name_;
+    }
+
+    const TupleSchema * getKeySchema() const {
+        return m_keySchema;
+    }
+
+    virtual std::string debug() const;
+    virtual std::string getTypeName() const = 0;
+
+    virtual void _ensureCapacity(uint32_t capacity) {}
+
+    // print out info about lookup usage
+    virtual void _printReport();
+
+    //TODO Useful implementation of == operator.
+    virtual bool equals(const TableIndex *other) const;
+
+    TableIndexScheme getScheme() const {
+        return m_scheme;
+    }
+    
+    virtual voltdb::IndexStats* getIndexStats();
+
+protected:
+    TableIndex(const TableIndexScheme &scheme);
+
+    const TableIndexScheme m_scheme;
+    TupleSchema* m_keySchema;
+    std::string name_;
+    std::vector<int> column_indices_vector_;
+    std::vector<ValueType> column_types_vector_;
+    ValueType* column_types_;
+    int colCount_;
+    bool is_unique_index_;
+    int* column_indices_;
+
+    // counters
+    int m_lookups;
+    int m_inserts;
+    int m_deletes;
+    int m_updates;
+    TupleSchema *m_tupleSchema;
+    
+    // stats
+    IndexStats m_stats;
+
+    // index memory size
+    int64_t m_memoryEstimate;
 
   private:
+#define GCC_VERSION (__GNUC__ * 10000 \
+    + __GNUC_MINOR__ * 100 \
+    + __GNUC_PATCHLEVEL__)
+
     struct TASLock {
       bool state;
     };
 
     void initLock() const {
 #ifdef ANTICACHE
-      m_anticacheLock.state = 0;
+#if GCC_VERSION >= 40700
+      __atomic_clear(&(m_anticacheLock.state), __ATOMIC_SEQ_CST);
+#else
+      __sync_lock_release(&(m_anticacheLock.state));
+#endif
 #endif
     }
-
-#define GCC_VERSION (__GNUC__ * 10000 \
-    + __GNUC_MINOR__ * 100 \
-    + __GNUC_PATCHLEVEL__)
 
     void lock() const {
 #ifdef ANTICACHE
@@ -517,35 +507,6 @@ class LockBasedTableIndex : public TableIndex {
 #endif
 #endif
     }
-
-    virtual bool _addEntry(const TableTuple *tuple) = 0;
-    virtual bool _deleteEntry(const TableTuple *tuple) = 0;
-    virtual bool _replaceEntry(const TableTuple *oldTupleValue, const TableTuple *newTupleValue) = 0;
-    virtual bool _setEntryToNewAddress(const TableTuple *tuple, const void* address, const void* oldAddress) = 0;
-    virtual bool _checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) = 0;
-    virtual bool _exists(const TableTuple* values) = 0;
-    virtual bool _moveToKey(const TableTuple *searchKey) = 0;
-    virtual bool _moveToTuple(const TableTuple *searchTuple) = 0;
-    virtual void _ensureCapacity(uint32_t capacity) {
-    }
-    virtual size_t _getSize() const = 0;
-    virtual void _printReport() {};
-    virtual TableTuple _nextValueAtKey() = 0;
-    virtual bool _advanceToNextKey() {
-        throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
-    };
-    virtual void _moveToKeyOrGreater(const TableTuple *searchKey) {
-        throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
-    };
-    virtual void _moveToGreaterThanKey(const TableTuple *searchKey) {
-        throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
-    };
-    virtual void _moveToEnd(bool begin) {
-        throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
-    }
-    virtual TableTuple _nextValue() {
-        throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
-    };
 
 #ifdef ANTICACHE
     mutable TASLock m_anticacheLock;
